@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Leads · Alex</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c27;
+    --border: #2a2a3a;
+    --accent: #00e5a0;
+    --luciano: #f59e0b;
+    --sandro: #3b82f6;
+    --text: #f0f0f8;
+    --muted: #6b6b80;
+    --danger: #ef4444;
+    --success: #22c55e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* TABS */
+  .tab-bar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 4px;
+  }
+
+  .tab-logo {
+    font-size: 13px; font-weight: 800; color: var(--accent);
+    margin-right: 12px; letter-spacing: -0.3px; white-space: nowrap;
+  }
+
+  .tab-btn {
+    background: none; border: none; color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+    padding: 14px 14px; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-spacer { flex: 1; }
+
+  .sync-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted);
+  }
+  .sync-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted); transition: background 0.3s;
+  }
+  .sync-dot.ok      { background: var(--success); }
+  .sync-dot.err     { background: var(--danger); }
+  .sync-dot.syncing { background: var(--accent); animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* PAGES */
+  .page { display: none; position: relative; z-index: 1; }
+  .page.active { display: block; }
+
+  .wrapper { max-width: 520px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  /* NEXT INDICATOR */
+  .next-indicator {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px 20px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 16px;
+    position: relative; overflow: hidden;
+  }
+  .next-indicator::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--next-color, var(--accent)); transition: background 0.4s;
+  }
+  .next-avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 800; flex-shrink: 0;
+    background: var(--next-color-dim, rgba(0,229,160,0.12));
+    color: var(--next-color, var(--accent));
+    border: 2px solid var(--next-color, var(--accent)); transition: all 0.4s;
+  }
+  .next-info { flex: 1; }
+  .next-tag { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 3px; }
+  .next-name { font-size: 17px; font-weight: 700; color: var(--next-color, var(--accent)); transition: color 0.4s; }
+  .turn-count { text-align: right; }
+  .turn-num { font-size: 20px; font-weight: 800; font-family: 'DM Mono', monospace; color: var(--accent); line-height: 1; }
+  .turn-lbl { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 14px; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; font-family: 'DM Mono', monospace; }
+  .field input, .field textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 13px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 14px; outline: none;
+    transition: border-color 0.2s; resize: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+
+  .phone-row { display: flex; gap: 8px; align-items: flex-end; }
+  .phone-row .field { flex: 1; margin-bottom: 0; }
+  .paste-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 13px; color: var(--muted);
+    cursor: pointer; font-size: 17px; transition: all 0.2s; flex-shrink: 0;
+  }
+  .paste-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .source-row { display: flex; gap: 7px; }
+  .source-btn {
+    flex: 1; background: var(--surface2); border: 2px solid var(--border);
+    border-radius: 9px; padding: 9px 6px; color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .source-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,160,0.07); }
+
+  .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .prod-btn {
+    background: var(--surface2); border: 2px solid var(--border);
+    border-radius: 9px; padding: 9px 8px; color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.18s; text-align: center;
+  }
+  .prod-btn:hover { border-color: var(--accent); color: var(--text); }
+  .prod-btn.selected { border-color: var(--accent); background: rgba(0,229,160,0.1); color: var(--accent); }
+
+  .other-service-row { display: flex; gap: 7px; margin-top: 7px; }
+  .other-service-row input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 12px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s;
+  }
+  .other-service-row input:focus { border-color: var(--accent); }
+  .other-service-row input::placeholder { color: var(--muted); }
+  .add-other-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 13px; color: var(--accent);
+    font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: all 0.2s;
+  }
+  .add-other-btn:hover { border-color: var(--accent); background: rgba(0,229,160,0.08); }
+
+  .extra-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .extra-tag {
+    background: rgba(0,229,160,0.1); border: 1px solid var(--accent);
+    border-radius: 7px; padding: 3px 9px; font-size: 11px; color: var(--accent);
+    font-weight: 600; display: flex; align-items: center; gap: 5px;
+  }
+  .extra-tag button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 13px; opacity: 0.7; padding: 0; }
+  .extra-tag button:hover { opacity: 1; }
+
+  /* SEND BUTTONS */
+  .send-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .send-btn {
+    border: none; border-radius: 14px; padding: 18px 12px;
+    font-family: 'Syne', sans-serif; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .send-btn:active { transform: scale(0.97); }
+  .btn-luciano { background: linear-gradient(135deg, #92400e, #d97706); color: #fff; box-shadow: 0 4px 20px rgba(245,158,11,0.2); }
+  .btn-sandro  { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; box-shadow: 0 4px 20px rgba(59,130,246,0.2); }
+  .send-btn.is-next { animation: pulse-next 2s ease-in-out infinite; }
+  .btn-luciano.is-next { box-shadow: 0 4px 30px rgba(245,158,11,0.5); }
+  .btn-sandro.is-next  { box-shadow: 0 4px 30px rgba(59,130,246,0.5); }
+  @keyframes pulse-next { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+  .btn-icon  { font-size: 22px; }
+  .btn-name  { font-size: 15px; font-weight: 800; }
+  .btn-label { font-size: 10px; opacity: 0.75; letter-spacing: 1px; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+
+  /* LEADS PAGE */
+  .leads-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .leads-title { font-size: 18px; font-weight: 800; flex: 1; }
+  .filter-row { display: flex; gap: 7px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,229,160,0.07); }
+
+  .lead-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+  .lead-card-top { display: flex; align-items: flex-start; gap: 12px; }
+  .lead-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 800; flex-shrink: 0;
+  }
+  .lead-main { flex: 1; min-width: 0; }
+  .lead-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .lead-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .lead-services { font-size: 11px; color: var(--text); opacity: 0.65; margin-top: 3px; }
+  .obs-text { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 5px; line-height: 1.4; }
+
+  .lead-card-bottom {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  }
+  .status-select {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 10px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; outline: none;
+  }
+  .vendedor-badge {
+    font-size: 10px; font-weight: 700; padding: 4px 9px;
+    border-radius: 6px; flex-shrink: 0; white-space: nowrap;
+  }
+  .vendedor-badge.luciano { background: rgba(245,158,11,0.15); color: var(--luciano); }
+  .vendedor-badge.sandro  { background: rgba(59,130,246,0.15);  color: var(--sandro); }
+
+  .wa-btn {
+    background: #25d366; border: none; border-radius: 7px;
+    padding: 6px 11px; color: #fff; font-size: 15px;
+    cursor: pointer; transition: opacity 0.2s; flex-shrink: 0;
+  }
+  .wa-btn:hover { opacity: 0.85; }
+
+  .empty-state {
+    text-align: center; color: var(--muted);
+    font-size: 13px; font-family: 'DM Mono', monospace; padding: 40px 20px;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2); border: 1px solid var(--accent);
+    border-radius: 12px; padding: 11px 18px;
+    font-size: 13px; font-weight: 600; color: var(--accent);
+    z-index: 999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <span class="tab-logo">Alex · Leads</span>
+  <button class="tab-btn active" id="tabEnviar" onclick="showPage('enviar', this)">Enviar Lead</button>
+  <button class="tab-btn" id="tabLeads" onclick="showPage('leads', this)">Leads Salvos</button>
+  <div class="tab-spacer"></div>
+  <div class="sync-status">
+    <div class="sync-dot ok" id="syncDot"></div>
+  </div>
+</div>
+
+<!-- PAGE: ENVIAR -->
+<div class="page active" id="pageEnviar">
+  <div class="wrapper">
+
+    <div class="next-indicator" id="nextIndicator">
+      <div class="next-avatar" id="nextAvatar">L</div>
+      <div class="next-info">
+        <div class="next-tag">Próximo turno</div>
+        <div class="next-name" id="nextName">Luciano</div>
+      </div>
+      <div class="turn-count">
+        <div class="turn-num" id="totalCount">0</div>
+        <div class="turn-lbl">enviados</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Dados do Lead</div>
+
+      <div class="field">
+        <label>Nome</label>
+        <input type="text" id="leadName" placeholder="Nome do cliente" />
+      </div>
+
+      <div class="field">
+        <label>Cidade</label>
+        <input type="text" id="leadCity" placeholder="Ex: Sorocaba" />
+      </div>
+
+      <div class="field">
+        <label>Telefone</label>
+        <div class="phone-row">
+          <div class="field">
+            <input type="tel" id="leadPhone" placeholder="(15) 99999-9999" />
+          </div>
+          <button class="paste-btn" onclick="pastePhone()" title="Colar">📋</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Origem</label>
+        <div class="source-row">
+          <button class="source-btn active" onclick="setSource(this, 'Instagram')">Instagram</button>
+          <button class="source-btn" onclick="setSource(this, 'Site')">Site</button>
+          <button class="source-btn" onclick="setSource(this, 'Outro')">Outro</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Serviços de Interesse</label>
+        <div class="products-grid">
+          <button class="prod-btn" onclick="toggleProduct(this, 'Forro de Gesso')">Forro de Gesso</button>
+          <button class="prod-btn" onclick="toggleProduct(this, 'Divisórias em Drywall')">Divisórias em Drywall</button>
+          <button class="prod-btn" onclick="toggleProduct(this, 'Sancas de Gesso')">Sancas de Gesso</button>
+          <button class="prod-btn" onclick="toggleProduct(this, 'Nichos em Gesso')">Nichos em Gesso</button>
+          <button class="prod-btn" onclick="toggleProduct(this, 'Decorações em Gesso')">Decorações em Gesso</button>
+        </div>
+        <div class="other-service-row">
+          <input type="text" id="otherService" placeholder="Outro serviço..." />
+          <button class="add-other-btn" onclick="addOtherService()">+ Adicionar</button>
+        </div>
+        <div id="extraTags" class="extra-tags"></div>
+      </div>
+
+      <div class="field">
+        <label>Observação</label>
+        <textarea id="leadObs" rows="2" placeholder="Tamanho do ambiente, detalhes extras..."></textarea>
+      </div>
+    </div>
+
+    <div class="send-grid">
+      <button class="send-btn btn-luciano is-next" id="btnLuciano" onclick="sendLead('luciano')">
+        <span class="btn-icon">📲</span>
+        <span class="btn-name">Luciano</span>
+        <span class="btn-label">Enviar lead</span>
+      </button>
+      <button class="send-btn btn-sandro" id="btnSandro" onclick="sendLead('sandro')">
+        <span class="btn-icon">📲</span>
+        <span class="btn-name">Sandro</span>
+        <span class="btn-label">Enviar lead</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- PAGE: LEADS SALVOS -->
+<div class="page" id="pageLeads">
+  <div class="wrapper">
+    <div class="leads-header">
+      <span class="leads-title">Leads Salvos</span>
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter(this, 'todos')">Todos</button>
+      <button class="filter-btn" onclick="setFilter(this, 'Novo')">Novos</button>
+      <button class="filter-btn" onclick="setFilter(this, 'Em atendimento')">Em atendimento</button>
+      <button class="filter-btn" onclick="setFilter(this, 'Fechado')">Fechados</button>
+      <button class="filter-btn" onclick="setFilter(this, 'Perdido')">Perdidos</button>
+    </div>
+    <div id="leadsList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbxMTilop1sQz5kOx2ZeuzpODTW9XsV6-mk4t2MNI-sws88zcjo6Xkyjd-8-AvcowRMj5w/exec';
+
+  const VENDEDORES = {
+    luciano: { nome: 'Luciano', telefone: '5515996997353', cor: '#f59e0b', corDim: 'rgba(245,158,11,0.12)' },
+    sandro:  { nome: 'Sandro',  telefone: '5515997181760', cor: '#3b82f6', corDim: 'rgba(59,130,246,0.12)' }
+  };
+
+  const STATUS_OPTIONS = ['Novo', 'Em atendimento', 'Fechado', 'Perdido'];
+
+  let state = {
+    nextTurn: 'luciano',
+    total: 0,
+    leads: [],
+    source: 'Instagram',
+  };
+
+  try {
+    const s = localStorage.getItem('alex_leads_v2');
+    if (s) state = { ...state, ...JSON.parse(s) };
+  } catch(e) {}
+
+  function save() {
+    try { localStorage.setItem('alex_leads_v2', JSON.stringify(state)); } catch(e) {}
+  }
+
+  // ---- TABS ----
+  function showPage(name, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'leads') renderLeads();
+  }
+
+  // ---- SOURCE ----
+  function setSource(btn, src) {
+    document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.source = src;
+  }
+
+  // ---- PHONE ----
+  async function pastePhone() {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('leadPhone').value = text.trim();
+      showToast('Número colado!');
+    } catch(e) {
+      document.getElementById('leadPhone').focus();
+    }
+  }
+
+  // ---- PRODUCTS ----
+  let selectedProducts = [];
+  let extraServices = [];
+
+  function toggleProduct(btn, product) {
+    btn.classList.toggle('selected');
+    if (btn.classList.contains('selected')) {
+      selectedProducts.push(product);
+    } else {
+      selectedProducts = selectedProducts.filter(p => p !== product);
+    }
+  }
+
+  function addOtherService() {
+    const input = document.getElementById('otherService');
+    const val = input.value.trim();
+    if (!val) return;
+    extraServices.push(val);
+    selectedProducts.push(val);
+    renderExtraTags();
+    input.value = '';
+  }
+
+  function removeExtraService(val) {
+    extraServices = extraServices.filter(s => s !== val);
+    selectedProducts = selectedProducts.filter(s => s !== val);
+    renderExtraTags();
+  }
+
+  function renderExtraTags() {
+    document.getElementById('extraTags').innerHTML = extraServices.map(s => `
+      <div class="extra-tag">${s}<button onclick="removeExtraService('${s.replace(/'/g,"\\'")}')">×</button></div>
+    `).join('');
+  }
+
+  function clearForm() {
+    document.getElementById('leadName').value = '';
+    document.getElementById('leadCity').value = '';
+    document.getElementById('leadPhone').value = '';
+    document.getElementById('leadObs').value = '';
+    selectedProducts = [];
+    extraServices = [];
+    document.querySelectorAll('.prod-btn').forEach(b => b.classList.remove('selected'));
+    renderExtraTags();
+  }
+
+  // ---- SEND LEAD ----
+  async function sendLead(vendedor) {
+    const nome     = document.getElementById('leadName').value.trim();
+    const cidade   = document.getElementById('leadCity').value.trim();
+    const telefone = document.getElementById('leadPhone').value.trim();
+    const obs      = document.getElementById('leadObs').value.trim();
+
+    if (!telefone) {
+      showToast('Informe o telefone do lead!', true);
+      document.getElementById('leadPhone').focus();
+      return;
+    }
+
+    const v = VENDEDORES[vendedor];
+
+    // Mensagem WhatsApp — limpa, sem emojis
+    let msg = `*Novo Lead - ${state.source}*\n`;
+    msg += `*Nome:* ${nome || 'Não informado'}\n`;
+    if (cidade) msg += `*Cidade:* ${cidade}\n`;
+    msg += `*Telefone:* ${telefone}\n`;
+    if (selectedProducts.length > 0) msg += `*Serviços:* ${selectedProducts.join(', ')}\n`;
+    if (obs) msg += `*Obs:* ${obs}`;
+
+    window.open(`https://wa.me/${v.telefone}?text=${encodeURIComponent(msg)}`, '_blank');
+
+    // Salva lead localmente
+    const lead = {
+      id: Date.now(),
+      nome, cidade, telefone,
+      servicos: selectedProducts.join(', '),
+      origem: state.source,
+      vendedor,
+      obs,
+      status: 'Novo',
+      data: new Date().toLocaleDateString('pt-BR'),
+      hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    state.leads.unshift(lead);
+    state.total++;
+    state.nextTurn = vendedor === 'luciano' ? 'sandro' : 'luciano';
+    save();
+    updateUI();
+    showToast(`Lead enviado para ${v.nome}!`);
+    clearForm();
+
+    // Sincroniza Google Sheets em background
+    syncToSheets(lead);
+  }
+
+  // ---- GOOGLE SHEETS ----
+  function setSyncStatus(status) {
+    document.getElementById('syncDot').className = 'sync-dot ' + status;
+  }
+
+  function syncToSheets(lead) {
+    setSyncStatus('syncing');
+    try {
+      const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSetDS3We1vZl7CmiCUHSFP6r7PkAby2nRR82Ay1mlBVE8luQQ/formResponse';
+
+      const params = new URLSearchParams({
+        'entry.887761729':  lead.nome || '',
+        'entry.1018577536': lead.telefone || '',
+        'entry.1963632927': lead.cidade || '',
+        'entry.763568790':  lead.servicos || '',
+        'entry.1198348056': lead.origem || '',
+        'entry.1585150273': VENDEDORES[lead.vendedor].nome,
+        'entry.1186086085': lead.obs || '',
+      });
+
+      const iframeName = 'gf_' + Date.now();
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = FORM_URL;
+      form.target = iframeName;
+      form.style.display = 'none';
+
+      for (const [key, value] of params.entries()) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      document.body.appendChild(form);
+      form.submit();
+
+      setTimeout(() => {
+        form.remove();
+        iframe.remove();
+        setSyncStatus('ok');
+      }, 3000);
+
+    } catch(e) {
+      setSyncStatus('err');
+      showToast('Erro ao salvar no Sheets', true);
+    }
+  }
+
+  // ---- UPDATE UI ----
+  function updateUI() {
+    const next = VENDEDORES[state.nextTurn];
+    const ind = document.getElementById('nextIndicator');
+    ind.style.setProperty('--next-color', next.cor);
+    ind.style.setProperty('--next-color-dim', next.corDim);
+    document.getElementById('nextAvatar').textContent = next.nome[0];
+    document.getElementById('nextName').textContent = next.nome;
+    document.getElementById('totalCount').textContent = state.total;
+    document.getElementById('btnLuciano').classList.toggle('is-next', state.nextTurn === 'luciano');
+    document.getElementById('btnSandro').classList.toggle('is-next', state.nextTurn === 'sandro');
+  }
+
+  // ---- LEADS LIST ----
+  let activeFilter = 'todos';
+
+  function setFilter(btn, filter) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = filter;
+    renderLeads();
+  }
+
+  function renderLeads() {
+    const list = document.getElementById('leadsList');
+    let leads = state.leads;
+    if (activeFilter !== 'todos') leads = leads.filter(l => l.status === activeFilter);
+
+    if (leads.length === 0) {
+      list.innerHTML = '<div class="empty-state">Nenhum lead encontrado.</div>';
+      return;
+    }
+
+    list.innerHTML = leads.map(lead => {
+      const v = VENDEDORES[lead.vendedor];
+      const phoneClean = lead.telefone.replace(/\D/g, '');
+      const waLink = `https://wa.me/55${phoneClean}`;
+
+      return `
+        <div class="lead-card" id="lead-${lead.id}">
+          <div class="lead-card-top">
+            <div class="lead-avatar" style="background:${v.corDim};color:${v.cor};border:2px solid ${v.cor}">
+              ${(lead.nome || '?')[0].toUpperCase()}
+            </div>
+            <div class="lead-main">
+              <div class="lead-name">${lead.nome || 'Sem nome'}</div>
+              <div class="lead-meta">${lead.cidade ? lead.cidade + ' · ' : ''}${lead.telefone} · ${lead.data} ${lead.hora}</div>
+              ${lead.servicos ? `<div class="lead-services">${lead.servicos}</div>` : ''}
+              ${lead.obs ? `<div class="obs-text">"${lead.obs}"</div>` : ''}
+            </div>
+          </div>
+          <div class="lead-card-bottom">
+            <select class="status-select" onchange="updateStatus(${lead.id}, this.value)">
+              ${STATUS_OPTIONS.map(s => `<option value="${s}" ${lead.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+            <span class="vendedor-badge ${lead.vendedor}">${v.nome}</span>
+            <button class="wa-btn" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp">💬</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function updateStatus(id, newStatus) {
+    const lead = state.leads.find(l => l.id === id);
+    if (lead) { lead.status = newStatus; save(); renderLeads(); }
+  }
+
+  // ---- TOAST ----
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  updateUI();
+</script>
+</body>
+</html>
